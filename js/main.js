@@ -172,7 +172,7 @@ foreign.addEventListener('change', () => {
     totalValue();
 });
 
-switchConin.addEventListener('click', function () {
+switchConin.addEventListener('click', () => {
     switchValue();
     [saveCoin[0], saveCoin[1]] = [saveCoin[1], saveCoin[0]];
     totalValue();
