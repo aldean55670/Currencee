@@ -15,79 +15,84 @@ let load = document.querySelector('.icon-spin');
 let saveCoin = [];
 let saveData = [];
 let cacheCurrence = {};
+
 // ============================================
 // TOM SELECT
 // ============================================
-let s1;
-let s2;
-setTimeout(function () {
-    s1 = new TomSelect("#from", {
-        maxItems: 1,
-        minItems: 1,
-        // allowEmptyOption: false,
-        onDelete: function (values) {
-            return false; 
-        }
-    });
-    s2 = new TomSelect("#switch-to", {
-        maxItems: 1,
-        minItems: 1,
-        onDelete: function (values) {
-            return false;
-        }
+let s1 = new TomSelect("#from", {
+    maxItems: 1,
+    minItems: 1,
+    valueField: 'value',
+    labelField: 'text',
+    searchField: 'text',
+    onDelete: function (values) {
+        return false;
+    },
+    onChange: function (value) {
+        syncDisabledOptions(value);
+    }
+});
 
-    });
-}, 100)
+let s2 = new TomSelect("#switch-to", {
+    maxItems: 1,
+    minItems: 1,
+    valueField: 'value',
+    labelField: 'text',
+    searchField: 'text',
+    onDelete: function (values) {
+        return false;
+    },
+    onChange: function (value) {
+        syncDisabledOptions(value);
+    }
+});
+
 // ============================================
 // GET DATA FROM API
 // ============================================
 fetch("https://openexchangerates.org/api/currencies.json")
     .then(response => response.json())
     .then(data => {
+        // save data in array
         saveData.push(data)
-        console.log(saveData)
+
+        // create option for select
         Object.entries(data).forEach(function ([key, value]) {
-            base.innerHTML += `
-            <option value="${key}" ${key.toLowerCase() == 'usd' ? 'selected' : ''}>${value}</option>
-            `;
-            foreign.innerHTML += `
-            <option value="${key}" ${key.toLowerCase() == 'egp' ? 'selected' : ''}>${value}</option>
-            `;
+            // Add option to select
+            let optionData = { value: key, text: value };
+            s1.addOption(optionData)
+            s2.addOption(optionData)
         })
+
+        // Add option to select
+        s1.setValue('USD')
+        s2.setValue('EGP')
+
+        // Sync disabled options after initial values are set
+        syncDisabledOptions();
+
         toCoin();
     })
     .catch(function () {
-        console.log("Error Fetching")
+        errorState()
     })
 
 function toCoin() {
     load.style.display = 'flex';
-    // console.log(base.value, foreign.value)
     if (!base.value || !foreign.value) return;
-    fetch(`https://www.floatrates.com/daily/${base.value}.json`)
-        .then(response => response.json())
-        .then(coin => {
-            cacheCurrence = { ...coin }
-            load.style.display = 'none';
-            dataFromObj()
-            totalValue();
-        }).catch(function () {
-            load.style.display = 'none';
-            let box = document.querySelector('.box');
-            box.classList.add('error')
-            box.innerHTML = `
-            <div>
-                <i class="fa-solid fa-circle-exclamation" style="margin-inline-end: 5px;" ></i> error in connection, please check your internet
-            </div>
-            <button id="rotate">Refresh <i class="fas fa-refresh"></i></button>
-            `;
-            rotate.addEventListener('click', function () {
-                location.reload()
-            })
 
-            console.log("Error Fetching")
-        })
+    fetch(`https://www.floatrates.com/daily/${base.value}.json`)
+    .then(response => response.json())
+    .then(coin => {
+        cacheCurrence = { ...coin }
+        load.style.display = 'none';
+        dataFromObj()
+        totalValue();
+    }).catch(function () {
+        errorState()
+    })
 }
+
 // ============================================
 // FUNCTOINS
 // ============================================
@@ -107,23 +112,65 @@ function totalValue() {
 function switchValue() {
     let fromValue = s1.getValue();
     let toValue = s2.getValue();
-    s1.setValue(toValue, true)
-    s2.setValue(fromValue, true)
-    dataFromObj()
+
+    s1.setValue(toValue);
+    s2.setValue(fromValue);
+
+    toCoin();
+    totalValue();
 }
 
 function dataFromObj() {
     let keyCoin = foreign.value.toLowerCase();
-    let keyCoin2 = base.value.toLowerCase();
-
-    // console.log(keyCoin)
     if (cacheCurrence[keyCoin]) {
         let one = cacheCurrence[keyCoin].rate;
         let tow = cacheCurrence[keyCoin].inverseRate;
         saveCoin = [one, tow];
     }
-
 }
+
+/**
+ * error state
+ */
+function errorState() {
+    let box = document.querySelector('.box');
+    box.classList.add('error')
+    box.innerHTML = `
+    <div>
+        <i class="fa-solid fa-circle-exclamation" style="margin-inline-end: 5px;" ></i> error in connection, please check your internet
+    </div>
+    <button id="rotate">Refresh <i class="fas fa-refresh"></i></button>
+    `;
+    load.style.display = 'none';
+    rotate.addEventListener('click', function () {
+        location.reload()
+    })
+}
+
+/**
+ * sync disabled options
+ */
+function syncDisabledOptions(value) {
+    console.log(value)
+    const fromValue = s1.getValue();
+    const toValue = s2.getValue();
+
+    // ===== Enable all options first =====
+    Object.keys(s1.options).forEach(key => {
+        s1.updateOption(key, { ...s1.options[key], disabled: false });
+        s2.updateOption(key, { ...s2.options[key], disabled: false });
+    });
+
+    // ===== Disable selected option in the other select =====
+    if (fromValue && s2.options[fromValue]) {
+        s2.updateOption(fromValue, { ...s2.options[fromValue], disabled: true });
+    }
+
+    if (toValue && s1.options[toValue]) {
+        s1.updateOption(toValue, { ...s1.options[toValue], disabled: true });
+    }
+}
+
 // ============================================
 // EVENTS
 // ============================================
@@ -134,7 +181,6 @@ amount.addEventListener('input', function () {
 
 base.addEventListener('change', function () {
     toCoin();
-    // dataFromObj();
     totalValue();
 })
 
@@ -149,4 +195,3 @@ switchConin.addEventListener('click', function () {
     totalValue()
 
 })
-
